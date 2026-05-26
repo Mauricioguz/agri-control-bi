@@ -1,20 +1,37 @@
 // Controlador Principal de AgriControl BI - Finca La Leonora
 
-// Cargar estado inicial
-initLocalStorageData();
+// Constantes de autocompletado (sugerencias por defecto)
+const SUGGESTED_CULTIVOS = ["Café", "Cacao", "Aguacate", "Maíz", "Cítricos", "Plátano"];
+const SUGGESTED_LABORES = [
+  "Fertilización Foliar",
+  "Fertilización Suelo/Piso",
+  "Herbicida",
+  "Control de Plagas",
+  "Riego",
+  "Poda",
+  "Enmienda Suelo",
+  "Cosecha",
+  "Monitoreo"
+];
+const SUGGESTED_PRODUCTOS = [
+  { id: "prod-def-1", nombre: "Fertilizante Foliar Líquido", tipo: "Fertilización Foliar" },
+  { id: "prod-def-2", nombre: "Abono Orgánico (Compost)", tipo: "Fertilización Suelo/Piso" },
+  { id: "prod-def-3", nombre: "Fungicida Preventivo", tipo: "Control de Plagas" },
+  { id: "prod-def-4", nombre: "Herbicida Selectivo", tipo: "Herbicida" }
+];
 
 let STATE = {
-  lotes: JSON.parse(localStorage.getItem("agri_lotes")) || [],
-  actividades: JSON.parse(localStorage.getItem("agri_actividades")) || [],
-  estudiosSuelo: JSON.parse(localStorage.getItem("agri_estudios_suelo")) || [],
-  dosificacionesHistoricas: JSON.parse(localStorage.getItem("agri_dosificaciones_historicas")) || [],
-  clima: JSON.parse(localStorage.getItem("agri_clima")),
+  lotes: [],
+  actividades: [],
+  estudiosSuelo: [],
+  dosificacionesHistoricas: [],
+  clima: { temporada: "sequia", temperaturaPromedio: 28, humedadPromedio: 60 },
   
-  // Sugerencias persistentes en LocalStorage
-  sugCultivos: JSON.parse(localStorage.getItem("agri_sug_cultivos")) || SUGGESTED_CULTIVOS,
-  sugLabores: JSON.parse(localStorage.getItem("agri_sug_labores")) || SUGGESTED_LABORES,
-  sugPersonal: JSON.parse(localStorage.getItem("agri_sug_personal")) || SUGGESTED_PERSONAL,
-  sugProductos: JSON.parse(localStorage.getItem("agri_sug_productos")) || SUGGESTED_PRODUCTOS
+  // Sugerencias locales / sistema
+  sugCultivos: SUGGESTED_CULTIVOS,
+  sugLabores: SUGGESTED_LABORES,
+  sugPersonal: [],
+  sugProductos: SUGGESTED_PRODUCTOS
 };
 
 // Instancias de Chart.js globales
@@ -22,41 +39,55 @@ let chartProductividad = null;
 let chartDistribucion = null;
 
 // Ejecución al iniciar
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   setupNavigation();
   setupClimateToggles();
   setupFormsAndModals();
-  sincronizarDatalists();
-  applyFilters(); // Carga de datos iniciales
+  
+  // Cargar datos desde la API al iniciar
+  await refreshStateFromAPI();
   
   // Establecer fecha
   document.getElementById("current-time-lbl").textContent = HOY;
 });
 
-// Guardado de estado en LocalStorage
-function saveState() {
-  localStorage.setItem("agri_lotes", JSON.stringify(STATE.lotes));
-  localStorage.setItem("agri_actividades", JSON.stringify(STATE.actividades));
-  localStorage.setItem("agri_estudios_suelo", JSON.stringify(STATE.estudiosSuelo));
-  localStorage.setItem("agri_dosificaciones_historicas", JSON.stringify(STATE.dosificacionesHistoricas));
-  localStorage.setItem("agri_clima", JSON.stringify(STATE.clima));
-  
-  // Guardar listas de sugerencias actualizadas
-  localStorage.setItem("agri_sug_cultivos", JSON.stringify(STATE.sugCultivos));
-  localStorage.setItem("agri_sug_labores", JSON.stringify(STATE.sugLabores));
-  localStorage.setItem("agri_sug_personal", JSON.stringify(STATE.sugPersonal));
-  localStorage.setItem("agri_sug_productos", JSON.stringify(STATE.sugProductos));
-  
-  // Sincronizar autocompletados
-  sincronizarDatalists();
-  
-  // Refrescar vistas
-  updateDashboard();
-  renderLotesGrid();
-  applyFilters();
-  renderSuelosGrid();
-  updateClimatePanel();
-  
+// Refrescar el estado de la aplicación desde la API REST
+async function refreshStateFromAPI() {
+  try {
+    const [lotesRes, actividadesRes, suelosRes, dosificacionesRes, climaRes, personalRes] = await Promise.all([
+      fetch('/api/lotes'),
+      fetch('/api/actividades'),
+      fetch('/api/suelos'),
+      fetch('/api/dosificaciones'),
+      fetch('/api/clima'),
+      fetch('/api/personal')
+    ]);
+
+    STATE.lotes = await lotesRes.json();
+    STATE.actividades = await actividadesRes.json();
+    STATE.estudiosSuelo = await suelosRes.json();
+    STATE.dosificacionesHistoricas = await dosificacionesRes.json();
+    STATE.clima = await climaRes.json();
+    STATE.sugPersonal = await personalRes.json();
+
+    // Sincronizar autocompletados
+    sincronizarDatalists();
+
+    // Refrescar vistas
+    updateDashboard();
+    renderLotesGrid();
+    applyFilters();
+    renderSuelosGrid();
+    updateClimatePanel();
+  } catch (err) {
+    console.error("Error al refrescar estado desde la API:", err);
+    showToast("Error de conexión con la base de datos.");
+  }
+}
+
+// Guardado de estado (ahora delega al refresco desde la API ya que las operaciones mutan la BD directamente)
+async function saveState() {
+  await refreshStateFromAPI();
   if (window.lucide) lucide.createIcons();
 }
 
@@ -346,41 +377,49 @@ function setupClimateToggles() {
   const btnSequia = document.getElementById("btn-clima-sequia");
   const btnLluvia = document.getElementById("btn-clima-lluvia");
 
-  const syncActiveState = () => {
-    if (STATE.clima.temporada === "sequia") {
+  const updateClimaAPI = async (temporada, temp, hum) => {
+    try {
+      const response = await fetch('/api/clima', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ temporada, temperaturaPromedio: temp, humedadPromedio: hum })
+      });
+      if (!response.ok) throw new Error("Error al actualizar clima");
+      await saveState();
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar cambios de clima.");
+    }
+  };
+
+  btnSequia.addEventListener("click", async () => {
+    await updateClimaAPI("sequia", 30, 45);
+    showToast("Clima cambiado a Sequía. Recomendaciones actualizadas.");
+  });
+
+  btnLluvia.addEventListener("click", async () => {
+    await updateClimaAPI("lluvia", 24, 85);
+    showToast("Clima cambiado a Lluvias. Recomendaciones de hongos activas.");
+  });
+}
+
+function updateClimatePanel() {
+  if (!STATE.clima) return;
+  const temp = STATE.clima.temporada;
+  const isSequia = temp === "sequia";
+  
+  const btnSequia = document.getElementById("btn-clima-sequia");
+  const btnLluvia = document.getElementById("btn-clima-lluvia");
+  if (btnSequia && btnLluvia) {
+    if (isSequia) {
       btnSequia.classList.add("active");
       btnLluvia.classList.remove("active");
     } else {
       btnLluvia.classList.add("active");
       btnSequia.classList.remove("active");
     }
-  };
+  }
 
-  btnSequia.addEventListener("click", () => {
-    STATE.clima.temporada = "sequia";
-    STATE.clima.temperaturaPromedio = 30;
-    STATE.clima.humedadPromedio = 45;
-    syncActiveState();
-    saveState();
-    showToast("Clima cambiado a Sequía. Recomendaciones actualizadas.");
-  });
-
-  btnLluvia.addEventListener("click", () => {
-    STATE.clima.temporada = "lluvia";
-    STATE.clima.temperaturaPromedio = 24;
-    STATE.clima.humedadPromedio = 85;
-    syncActiveState();
-    saveState();
-    showToast("Clima cambiado a Lluvias. Recomendaciones de hongos activas.");
-  });
-
-  syncActiveState();
-}
-
-function updateClimatePanel() {
-  const temp = STATE.clima.temporada;
-  const isSequia = temp === "sequia";
-  
   const iconDiv = document.getElementById("climate-panel-icon");
   const titleDiv = document.getElementById("climate-panel-title");
   const descDiv = document.getElementById("climate-panel-desc");
@@ -405,25 +444,45 @@ function updateClimatePanel() {
   // Recomendaciones de clima
   const recs = generarRecomendaciones(STATE.lotes, STATE.actividades, STATE.clima, STATE.estudiosSuelo);
   const climateRecsContainer = document.getElementById("clima-recs-list");
-  climateRecsContainer.innerHTML = "";
+  if (climateRecsContainer) {
+    climateRecsContainer.innerHTML = "";
 
-  const weatherRecs = recs.filter(r => r.categoria === "Riego" || r.categoria === "Control de Plagas" || r.categoria === "Enmienda Suelo");
+    const weatherRecs = recs.filter(r => r.categoria === "Riego" || r.categoria === "Control de Plagas" || r.categoria === "Enmienda Suelo");
 
-  if (weatherRecs.length === 0) {
-    climateRecsContainer.innerHTML = `<div class="empty-recs"><p>No hay alertas climáticas.</p></div>`;
-  } else {
-    weatherRecs.forEach(r => {
-      climateRecsContainer.appendChild(crearElementoRecomendacion(r));
-    });
+    if (weatherRecs.length === 0) {
+      climateRecsContainer.innerHTML = `<div class="empty-recs"><p>No hay alertas climáticas.</p></div>`;
+    } else {
+      weatherRecs.forEach(r => {
+        climateRecsContainer.appendChild(crearElementoRecomendacion(r));
+      });
+    }
   }
 
-  inputTemp.onchange = (e) => {
-    STATE.clima.temperaturaPromedio = parseInt(e.target.value) || 25;
-    saveState();
+  inputTemp.onchange = async (e) => {
+    const parsedTemp = parseInt(e.target.value) || 25;
+    try {
+      await fetch('/api/clima', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...STATE.clima, temperaturaPromedio: parsedTemp })
+      });
+      await saveState();
+    } catch (err) {
+      console.error(err);
+    }
   };
-  inputHum.onchange = (e) => {
-    STATE.clima.humedadPromedio = parseInt(e.target.value) || 60;
-    saveState();
+  inputHum.onchange = async (e) => {
+    const parsedHum = parseInt(e.target.value) || 60;
+    try {
+      await fetch('/api/clima', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...STATE.clima, humedadPromedio: parsedHum })
+      });
+      await saveState();
+    } catch (err) {
+      console.error(err);
+    }
   };
 }
 
@@ -534,13 +593,17 @@ function editarLote(id) {
   document.getElementById("lote-modal").classList.add("active");
 }
 
-function eliminarLote(id) {
+async function eliminarLote(id) {
   if (confirm("¿Estás seguro de eliminar este lote? Esto desasociará sus actividades de la vista general.")) {
-    STATE.lotes = STATE.lotes.filter(l => l.id !== id);
-    STATE.actividades = STATE.actividades.filter(a => a.loteId !== id);
-    STATE.estudiosSuelo = STATE.estudiosSuelo.filter(e => e.loteId !== id);
-    saveState();
-    showToast("Lote y datos asociados eliminados.");
+    try {
+      const response = await fetch(`/api/lotes/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error("Error al eliminar lote");
+      showToast("Lote y datos asociados eliminados.");
+      await saveState();
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar el lote.");
+    }
   }
 }
 
@@ -671,16 +734,27 @@ function applyFilters() {
   updateDashboard();
 }
 
-function toggleActivityStatus(id) {
+async function toggleActivityStatus(id) {
   const act = STATE.actividades.find(a => a.id === id);
   if (act) {
-    act.cumplida = !act.cumplida;
-    saveState();
-    showToast(`Actividad marcada como ${act.cumplida ? 'CUMPLIDA' : 'PENDIENTE'}.`);
+    const updatedAct = { ...act, cumplida: !act.cumplida };
+    try {
+      const response = await fetch(`/api/actividades/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedAct)
+      });
+      if (!response.ok) throw new Error("Error al cambiar estado");
+      showToast(`Actividad marcada como ${updatedAct.cumplida ? 'CUMPLIDA' : 'PENDIENTE'}.`);
+      await saveState();
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar el estado de la actividad.");
+    }
   }
 }
 
-function reprogramarDias(id, dias) {
+async function reprogramarDias(id, dias) {
   const act = STATE.actividades.find(a => a.id === id);
   if (!act) return;
 
@@ -691,9 +765,20 @@ function reprogramarDias(id, dias) {
   const mm = String(current.getMonth() + 1).padStart(2, '0');
   const dd = String(current.getDate()).padStart(2, '0');
   
-  act.fecha = `${yyyy}-${mm}-${dd}`;
-  saveState();
-  showToast(`Actividad ${dias > 0 ? 'postergada' : 'adelantada'} al ${act.fecha}.`);
+  const updatedAct = { ...act, fecha: `${yyyy}-${mm}-${dd}` };
+  try {
+    const response = await fetch(`/api/actividades/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedAct)
+    });
+    if (!response.ok) throw new Error("Error al reprogramar actividad");
+    showToast(`Actividad ${dias > 0 ? 'postergada' : 'adelantada'} al ${updatedAct.fecha}.`);
+    await saveState();
+  } catch (err) {
+    console.error(err);
+    alert("Error al reprogramar la actividad.");
+  }
 }
 
 function abrirModalActividad() {
@@ -771,11 +856,17 @@ function editarActividad(id) {
   document.getElementById("act-modal").classList.add("active");
 }
 
-function eliminarActividad(id) {
+async function eliminarActividad(id) {
   if (confirm("¿Estás seguro de borrar esta actividad de la bitácora?")) {
-    STATE.actividades = STATE.actividades.filter(a => a.id !== id);
-    saveState();
-    showToast("Actividad eliminada correctamente.");
+    try {
+      const response = await fetch(`/api/actividades/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error("Error al eliminar actividad");
+      showToast("Actividad eliminada correctamente.");
+      await saveState();
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar la actividad.");
+    }
   }
 }
 
@@ -892,11 +983,17 @@ function zoomImagenSuelo(id) {
   document.getElementById("zoom-modal").classList.add("active");
 }
 
-function eliminarSuelo(id) {
+async function eliminarSuelo(id) {
   if (confirm("¿Estás seguro de eliminar este registro de análisis de suelo?")) {
-    STATE.estudiosSuelo = STATE.estudiosSuelo.filter(e => e.id !== id);
-    saveState();
-    showToast("Análisis de suelo eliminado.");
+    try {
+      const response = await fetch(`/api/suelos/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error("Error al eliminar análisis");
+      showToast("Análisis de suelo eliminado.");
+      await saveState();
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar el análisis de suelo.");
+    }
   }
 }
 
@@ -916,7 +1013,7 @@ function setupFormsAndModals() {
   document.getElementById("act-form-lote").addEventListener("change", actualizarSelectoresActividad);
 
   // Submit Lote
-  document.getElementById("lote-form").addEventListener("submit", (e) => {
+  document.getElementById("lote-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("lote-form-id").value;
     const nombre = document.getElementById("lote-form-nombre").value.trim();
@@ -932,32 +1029,35 @@ function setupFormsAndModals() {
       return;
     }
 
-    if (id) {
-      const idx = STATE.lotes.findIndex(l => l.id === id);
-      if (idx !== -1) {
-        STATE.lotes[idx] = { id, nombre, cultivo, cultivo2, area, etapa, fechaSiembra: fecha, fechaSiembra2: fecha2 };
+    try {
+      if (id) {
+        const response = await fetch(`/api/lotes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, cultivo, cultivo2, area, etapa, fechaSiembra: fecha, fechaSiembra2: fecha2 })
+        });
+        if (!response.ok) throw new Error("Error al actualizar lote");
+      } else {
+        const nuevoId = `lote-${Date.now()}`;
+        const response = await fetch('/api/lotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nuevoId, nombre, cultivo, cultivo2, area, etapa, fechaSiembra: fecha, fechaSiembra2: fecha2 })
+        });
+        if (!response.ok) throw new Error("Error al crear lote");
       }
-    } else {
-      const nuevo = {
-        id: `lote-${Date.now()}`,
-        nombre,
-        cultivo,
-        cultivo2,
-        area,
-        etapa,
-        fechaSiembra: fecha,
-        fechaSiembra2: fecha2
-      };
-      STATE.lotes.push(nuevo);
-    }
 
-    document.getElementById("lote-modal").classList.remove("active");
-    saveState();
-    showToast("Lote de cultivo guardado correctamente.");
+      document.getElementById("lote-modal").classList.remove("active");
+      await saveState();
+      showToast("Lote de cultivo guardado correctamente.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar el lote.");
+    }
   });
 
   // Submit Actividad
-  document.getElementById("act-form").addEventListener("submit", (e) => {
+  document.getElementById("act-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = document.getElementById("act-form-id").value;
     const loteId = document.getElementById("act-form-lote").value;
@@ -978,44 +1078,41 @@ function setupFormsAndModals() {
       return;
     }
 
-    // Registrar Preset de dosificación si hay producto
-    if (productoNombre && dosificacion) {
-      // Remover duplicados previos del mismo producto
-      STATE.dosificacionesHistoricas = STATE.dosificacionesHistoricas.filter(d => d.producto.toLowerCase() !== productoNombre.toLowerCase());
-      STATE.dosificacionesHistoricas.push({ producto: productoNombre, dosificacion, metodo });
-    }
-
-    if (id) {
-      const idx = STATE.actividades.findIndex(a => a.id === id);
-      if (idx !== -1) {
-        const cum = STATE.actividades[idx].cumplida;
-        STATE.actividades[idx] = { 
-          id, loteId, cultivoObjetivo, tipo, productoNombre, cantidad, unidad, fecha, personal, etapa, dosificacion, metodo, cumplida: cum, notas: notesActualVal 
-        };
+    try {
+      if (productoNombre && dosificacion) {
+        await fetch('/api/dosificaciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ producto: productoNombre, dosificacion, metodo })
+        });
       }
-    } else {
-      const nueva = {
-        id: `act-${Date.now()}`,
-        loteId,
-        cultivoObjetivo,
-        tipo,
-        productoNombre,
-        cantidad,
-        unidad,
-        fecha,
-        personal,
-        etapa,
-        dosificacion,
-        metodo,
-        cumplida: false,
-        notas: notesActualVal
-      };
-      STATE.actividades.push(nueva);
-    }
 
-    document.getElementById("act-modal").classList.remove("active");
-    saveState();
-    showToast("Actividad agrícola registrada en agenda.");
+      if (id) {
+        const actPrev = STATE.actividades.find(a => a.id === id);
+        const cum = actPrev ? actPrev.cumplida : false;
+        const response = await fetch(`/api/actividades/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loteId, cultivoObjetivo, tipo, productoNombre, cantidad, unidad, fecha, personal, etapa, dosificacion, metodo, cumplida: cum, notas: notesActualVal })
+        });
+        if (!response.ok) throw new Error("Error al actualizar actividad");
+      } else {
+        const nuevoId = `act-${Date.now()}`;
+        const response = await fetch('/api/actividades', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nuevoId, loteId, cultivoObjetivo, tipo, productoNombre, cantidad, unidad, fecha, personal, etapa, dosificacion, metodo, cumplida: false, notas: notesActualVal })
+        });
+        if (!response.ok) throw new Error("Error al crear actividad");
+      }
+
+      document.getElementById("act-modal").classList.remove("active");
+      await saveState();
+      showToast("Actividad agrícola registrada en agenda.");
+    } catch (err) {
+      console.error(err);
+      alert("Error al registrar la actividad.");
+    }
   });
 
   // Submit Análisis de Suelo (Procesamiento Base64)
@@ -1035,20 +1132,23 @@ function setupFormsAndModals() {
     const file = fileInput.files[0];
     const reader = new FileReader();
 
-    reader.onloadend = () => {
-      const nuevoAnalisis = {
-        id: `suelo-${Date.now()}`,
-        loteId,
-        titulo,
-        fecha,
-        notas,
-        imagenBase64: reader.result // Cadena base64 para LocalStorage
-      };
-      STATE.estudiosSuelo.push(nuevoAnalisis);
-      
-      document.getElementById("suelo-modal").classList.remove("active");
-      saveState();
-      showToast("Estudio de suelos cargado correctamente a La Leonora.");
+    reader.onloadend = async () => {
+      try {
+        const nuevoId = `suelo-${Date.now()}`;
+        const response = await fetch('/api/suelos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: nuevoId, loteId, titulo, fecha, notas, imagenBase64: reader.result })
+        });
+        if (!response.ok) throw new Error("Error al guardar estudio de suelo");
+
+        document.getElementById("suelo-modal").classList.remove("active");
+        await saveState();
+        showToast("Estudio de suelos cargado correctamente a La Leonora.");
+      } catch (err) {
+        console.error(err);
+        alert("Error al cargar el estudio de suelos.");
+      }
     };
 
     reader.readAsDataURL(file); // Convierte archivo a cadena Base64
@@ -1136,7 +1236,7 @@ function renderPersonalList() {
   if (window.lucide) lucide.createIcons();
 }
 
-function agregarNuevoPersonal() {
+async function agregarNuevoPersonal() {
   const input = document.getElementById("personal-new-name");
   const name = input.value.trim();
 
@@ -1150,18 +1250,37 @@ function agregarNuevoPersonal() {
     return;
   }
 
-  STATE.sugPersonal.push(name);
-  input.value = "";
-  saveState();
-  renderPersonalList();
-  showToast(`Operario "${name}" agregado correctamente.`);
+  try {
+    const response = await fetch('/api/personal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre: name })
+    });
+    if (!response.ok) throw new Error("Error al guardar personal");
+    
+    input.value = "";
+    await saveState();
+    renderPersonalList();
+    showToast(`Operario "${name}" agregado correctamente.`);
+  } catch (err) {
+    console.error(err);
+    alert("Error al registrar al operario.");
+  }
 }
 
-function eliminarPersonal(name) {
+async function eliminarPersonal(name) {
   if (confirm(`¿Estás seguro de eliminar a "${name}" de la lista de operarios?`)) {
-    STATE.sugPersonal = STATE.sugPersonal.filter(p => p !== name);
-    saveState();
-    renderPersonalList();
-    showToast(`Operario "${name}" eliminado de la lista.`);
+    try {
+      const response = await fetch(`/api/personal/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) throw new Error("Error al eliminar personal");
+      await saveState();
+      renderPersonalList();
+      showToast(`Operario "${name}" eliminado de la lista.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar al operario.");
+    }
   }
 }
