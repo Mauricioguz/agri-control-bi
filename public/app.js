@@ -912,6 +912,17 @@ function renderSuelosGrid() {
     const card = document.createElement("div");
     card.className = "lote-card";
     
+    // Detectar si el reporte es PDF o Imagen
+    const isPdf = e.imagenBase64 && e.imagenBase64.startsWith("data:application/pdf");
+    const previewHtml = isPdf ? `
+      <div style="width:100%; height:100%; background:rgba(239,68,68,0.1); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--danger);">
+        <i data-lucide="file-text" style="width:32px; height:32px;"></i>
+        <span style="font-size:0.75rem; font-weight:600;">Documento PDF</span>
+      </div>
+    ` : `
+      <img src="${e.imagenBase64}" alt="Análisis" style="width:100%; height:100%; object-fit:cover;">
+    `;
+    
     card.innerHTML = `
       <div class="lote-header">
         <div>
@@ -922,7 +933,7 @@ function renderSuelosGrid() {
       </div>
       
       <div style="position:relative; height:120px; overflow:hidden; border-radius:10px; cursor:zoom-in; border:1px solid var(--border-color);" onclick="zoomImagenSuelo('${e.id}')">
-        <img src="${e.imagenBase64}" alt="Análisis" style="width:100%; height:100%; object-fit:cover;">
+        ${previewHtml}
         <div style="position:absolute; bottom:6px; right:6px; background:rgba(0,0,0,0.6); color:white; padding:4px 6px; font-size:0.7rem; border-radius:4px; display:flex; align-items:center; gap:4px;">
           <i data-lucide="zoom-in" style="width:10px; height:10px;"></i> Ampliar
         </div>
@@ -974,7 +985,33 @@ function zoomImagenSuelo(id) {
   const loteNombre = lote ? lote.nombre : "Lote Desconocido";
 
   document.getElementById("zoom-modal-title").textContent = `${e.titulo} - ${loteNombre}`;
-  document.getElementById("zoom-modal-img").src = e.imagenBase64;
+  
+  const isPdf = e.imagenBase64 && e.imagenBase64.startsWith("data:application/pdf");
+  const imgEl = document.getElementById("zoom-modal-img");
+  
+  // Buscar o crear el visor de PDF
+  let pdfEmbed = document.getElementById("zoom-modal-pdf");
+  
+  if (isPdf) {
+    imgEl.style.display = "none";
+    if (!pdfEmbed) {
+      pdfEmbed = document.createElement("embed");
+      pdfEmbed.id = "zoom-modal-pdf";
+      pdfEmbed.style.cssText = "width: 100%; height: 500px; border-radius: 6px; background: white;";
+      imgEl.parentNode.appendChild(pdfEmbed);
+    }
+    pdfEmbed.src = e.imagenBase64;
+    pdfEmbed.type = "application/pdf";
+    pdfEmbed.style.display = "block";
+  } else {
+    imgEl.src = e.imagenBase64;
+    imgEl.style.display = "inline-block";
+    if (pdfEmbed) {
+      pdfEmbed.style.display = "none";
+      pdfEmbed.src = "";
+    }
+  }
+
   document.getElementById("zoom-modal-desc").innerHTML = `
     <strong>Fecha del Análisis:</strong> ${e.fecha}<br>
     <strong>Observaciones:</strong> ${e.notas || 'Sin anotaciones adicionales.'}
