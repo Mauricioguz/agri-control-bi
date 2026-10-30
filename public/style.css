@@ -1181,3 +1181,33 @@ select.form-control option:checked {
   height: 100%;
   transition: width 0.3s ease;
 }
+
+
+/* Sticky Header y Footer para Modales */
+.modal-header-sticky {
+  position: sticky;
+  top: -22px;
+  background: #09110c;
+  z-index: 25;
+  padding-top: 4px;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.modal-footer-sticky {
+  position: sticky;
+  bottom: -22px;
+  background: #09110c;
+  z-index: 25;
+  padding-top: 12px;
+  padding-bottom: 4px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#act-modal .modal-content {
+  width: 640px;
+  max-width: 96vw;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
