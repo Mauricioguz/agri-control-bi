@@ -213,15 +213,554 @@
            SECTION 2: LOTES Y CULTIVOS
            ========================================================================== -->
       <section id="lotes-section" class="app-section">
-        <div class="modal-footer-sticky" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-secondary" id="btn-act-save-and-another" style="display:flex; align-items:center; gap:6px; border-color: rgba(16, 185, 129, 0.4); color: #34d399; font-weight: 600;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+          <div>
+            <h2 style="color:white; font-size:1.5rem;">Lotes de Cultivo</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Registra los sectores de la finca. Soporta hasta 2 cultivos por lote para policultivos.</p>
+          </div>
+          <button class="btn btn-primary" onclick="abrirModalLote()">
+            <i data-lucide="plus-circle"></i> Nuevo Lote
+          </button>
+        </div>
+
+        <div class="lotes-grid" id="lotes-container">
+          <!-- Inyectado desde app.js -->
+        </div>
+      </section>
+
+      <!-- ==========================================================================
+           SECTION 3: AGENDA DE ACTIVIDADES
+           ========================================================================== -->
+      <section id="agenda-section" class="app-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 style="color:white; font-size:1.5rem;">Bitácora de Labores</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Planifica las labores de la finca, márcalas como cumplidas en 1 clic y programa rápido.</p>
+          </div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <div style="display:flex; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:10px; padding:3px;">
+              <button type="button" id="btn-view-cards" class="btn btn-secondary" onclick="switchAgendaView('cards')" style="font-size:0.78rem; padding:6px 12px; border-radius:8px; background:rgba(16,185,129,0.2); color:#34d399; border:none;">
+                <i data-lucide="layout-grid"></i> Tarjetas
+              </button>
+              <button type="button" id="btn-view-table" class="btn btn-secondary" onclick="switchAgendaView('table')" style="font-size:0.78rem; padding:6px 12px; border-radius:8px; border:none; color:var(--text-muted);">
+                <i data-lucide="table"></i> Tabla
+              </button>
+            </div>
+            <button class="btn btn-secondary" onclick="abrirModalPersonal()" title="Gestionar Operarios">
+              <i data-lucide="users"></i> Operarios
+            </button>
+            <button class="btn btn-primary" onclick="abrirModalActividad()">
+              <i data-lucide="calendar-plus"></i> Programar Detallado
+            </button>
+          </div>
+        </div>
+
+        <!-- BARRA DE PROGRAMACIÓN RÁPIDA (EXPRÉS) -->
+        <div style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 14px; padding: 14px 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div style="font-weight: 700; color: #10b981; font-size: 0.92rem; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="zap" style="width: 17px; height: 17px; color: #fbbf24;"></i>
+              <span>Programación Exprés (Agendado Rápido en 1 Clic)</span>
+            </div>
+            <!-- Sugerencias de Labores frecuentes -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Plateo para café', 'Café', 'Crecimiento')">🌱 Plateo</button>
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Guadaña general', 'Ambos Cultivos', 'Crecimiento')">🚜 Guadaña</button>
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Deschuponada de café', 'Café', 'Fructificación')">🌿 Deschuponada</button>
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Control de Plagas', 'Aguacate', 'Floración')">💊 Control Plagas</button>
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Fertilización Foliar', 'Café', 'Crecimiento')">🧪 Fert. Foliar</button>
+              <button type="button" class="chip-labor" onclick="selectQuickLabor('Fertilización Suelo', 'Café', 'Siembra')">🌾 Fert. Suelo</button>
+            </div>
+          </div>
+
+          <form id="quick-act-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto; gap: 10px; align-items: flex-end;">
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Lote *</label>
+              <select id="quick-act-lote" class="form-control" required style="font-size: 0.85rem; padding: 7px 10px;"></select>
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Labor a Realizar *</label>
+              <input type="text" id="quick-act-tipo" class="form-control" list="labor-suggestions" placeholder="Ej. Plateo para café nuevo" required style="font-size: 0.85rem; padding: 7px 10px;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Fecha *</label>
+              <input type="date" id="quick-act-fecha" class="form-control" required style="font-size: 0.85rem; padding: 7px 10px;">
+            </div>
+            <div>
+              <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Operario *</label>
+              <input type="text" id="quick-act-personal" class="form-control" list="personal-suggestions" placeholder="Ej. Henry" required style="font-size: 0.85rem; padding: 7px 10px;">
+            </div>
+            <div>
+              <button type="submit" class="btn btn-primary" style="white-space: nowrap; height: 38px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+                <i data-lucide="plus"></i> Agendar
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Filter and Search Bar -->
+        <div class="filter-bar">
+          <div class="filter-controls">
+            <select id="filter-lote" class="filter-select" onchange="applyFilters()">
+              <option value="">Todos los Lotes</option>
+            </select>
+            <select id="filter-cumplida" class="filter-select" onchange="applyFilters()">
+              <option value="">Todos los Estados</option>
+              <option value="pendientes">Pendientes a futuro</option>
+              <option value="atrasadas">Atrasadas</option>
+              <option value="completadas">Cumplidas</option>
+            </select>
+            <input type="text" id="search-activity" class="search-input" placeholder="Buscar por labor, operario, notas..." oninput="applyFilters()">
+          </div>
+          <button class="btn btn-secondary" onclick="document.getElementById('search-activity').value=''; document.getElementById('filter-lote').value=''; document.getElementById('filter-cumplida').value=''; applyFilters();">
+            Limpiar Filtros
+          </button>
+        </div>
+
+        <!-- VISTA 1: TARJETAS VISUALES DE LABORES (Por Defecto) -->
+        <div id="agenda-cards-container" class="actividades-cards-grid">
+          <!-- Inyectado desde app.js -->
+        </div>
+
+        <!-- VISTA 2: TABLA DE LABORES -->
+        <div class="table-responsive" id="agenda-table-wrapper" style="display: none;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 140px;">Estado</th>
+                <th>Labor / Actividad</th>
+                <th>Etapa</th>
+                <th>Insumo, Dosificación & Aplicación</th>
+                <th>Fecha & Responsable</th>
+                <th>Notas de Campo</th>
+                <th style="width: 140px; text-align: right;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="agenda-table-body">
+              <!-- Cargado dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ==========================================================================
+           SECTION 4: ESTUDIOS DE SUELO
+           ========================================================================== -->
+      <section id="suelos-section" class="app-section">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+          <div>
+            <h2 style="color:white; font-size:1.5rem;">Estudios de Suelo y Análisis Químicos</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem;">Sube las imágenes de tus reportes de laboratorio. Se deben realizar dos análisis al año.</p>
+          </div>
+          <button class="btn btn-primary" onclick="abrirModalSuelo()">
+            <i data-lucide="file-up"></i> Registrar Análisis de Suelo
+          </button>
+        </div>
+
+        <!-- Gallery grid -->
+        <div class="lotes-grid" id="suelos-container">
+          <!-- Inyectado desde app.js -->
+        </div>
+      </section>
+
+      <!-- ==========================================================================
+           SECTION 5: CLIMA Y TEMPORADAS
+           ========================================================================== -->
+      <section id="clima-section" class="app-section">
+        <div style="margin-bottom:24px;">
+          <h2 style="color:white; font-size:1.5rem;">Monitoreo Climático Finca</h2>
+          <p style="color:var(--text-muted); font-size:0.9rem;">El clima define las necesidades de riego y el riesgo de enfermedades foliares.</p>
+        </div>
+
+        <div class="climate-panel">
+          <!-- Big Weather Display -->
+          <div class="climate-status-card">
+            <div id="climate-panel-icon" class="climate-icon-big sequia">
+              <i data-lucide="sun"></i>
+            </div>
+            <h3 id="climate-panel-title" style="color:white; font-size:1.3rem; margin-bottom:8px;">Temporada de Sequía</h3>
+            <p id="climate-panel-desc" style="color:var(--text-muted); font-size:0.85rem; max-width:280px;">Riego crítico activo para evitar pérdida foliar.</p>
+            
+            <div class="weather-stats-grid">
+              <div class="weather-stat-box">
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Temp. Promedio</div>
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                  <input type="number" id="climate-input-temp" class="form-control" style="width:60px; padding:4px 8px; text-align:center;" min="5" max="50">
+                  <span style="font-weight:600; color:white;">°C</span>
+                </div>
+              </div>
+              <div class="weather-stat-box">
+                <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:4px;">Humedad Relativa</div>
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+                  <input type="number" id="climate-input-hum" class="form-control" style="width:60px; padding:4px 8px; text-align:center;" min="0" max="100">
+                  <span style="font-weight:600; color:white;">%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Climate Recommendations -->
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title" style="color: var(--accent-blue);"><i data-lucide="shield-alert"></i> Mitigación y Labores Recomendadas por Clima</h3>
+            </div>
+            <div class="bi-recommendations-list" id="clima-recs-list" style="max-height: 420px;">
+              <!-- Se inyecta filtrado por clima -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==========================================================================
+       MODALS SECTION
+       ========================================================================== -->
+       
+  <!-- Modal: Crear/Editar Lote -->
+  <div class="modal-overlay" id="lote-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="lote-modal-title">Nuevo Lote de Cultivo</h3>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <form id="lote-form">
+        <input type="hidden" id="lote-form-id">
+        
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="lote-form-nombre">Nombre del Lote (Ej. Alejandra / Manuela) *</label>
+            <input type="text" id="lote-form-nombre" class="form-control" required placeholder="Ingrese el nombre del lote">
+          </div>
+          <div class="form-group">
+            <label for="lote-form-etapa">Etapa Vegetativa General</label>
+            <select id="lote-form-etapa" class="form-control">
+              <option value="Siembra">Siembra / Establecimiento</option>
+              <option value="Crecimiento">Crecimiento / Vegetativo</option>
+              <option value="Floración">Floración</option>
+              <option value="Fructificación">Fructificación</option>
+              <option value="Cosecha">Cosecha</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- SECCIÓN: SIEMBRA 1 / CULTIVO PRINCIPAL -->
+        <div style="background: rgba(16, 185, 129, 0.07); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-weight: 700; color: #10b981; font-size: 0.92rem; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="sprout" style="width: 16px; height: 16px;"></i> Siembra 1 (Cultivo Principal) *
+            </span>
+            <span style="font-size: 0.75rem; color: #34d399; font-weight: 600;" id="calc-preview-1-mini"></span>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="lote-form-cultivo">Cultivo / Variedad *</label>
+              <input type="text" id="lote-form-cultivo" class="form-control" list="crop-suggestions" required placeholder="Ej. Café Castillo / Geisha">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-fecha">Fecha de Siembra</label>
+              <input type="date" id="lote-form-fecha" class="form-control">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-arboles1" style="color: #a7f3d0;">Nº Árboles Actuales Sembrados</label>
+              <input type="number" id="lote-form-arboles1" class="form-control" min="0" step="1" placeholder="Ej. 9984">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-pendientes1" style="color: #fde68a;">Árboles Pendientes (Por Sembrar)</label>
+              <input type="number" id="lote-form-pendientes1" class="form-control" min="0" step="1" placeholder="Ej. 1500">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-surco1" style="color: #a7f3d0;" title="Distancia entre surcos o calles en metros">Dist. Surcos (m)</label>
+              <input type="number" id="lote-form-surco1" class="form-control" min="0" step="0.05" placeholder="Ej. 1.45">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-planta1" style="color: #a7f3d0;" title="Distancia entre plantas del mismo surco en metros">Dist. Plantas (m)</label>
+              <input type="number" id="lote-form-planta1" class="form-control" min="0" step="0.05" placeholder="Ej. 1.25">
+            </div>
+          </div>
+          <div id="calc-preview-1" style="font-size: 0.78rem; color: #34d399; margin-top: 8px; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 6px; display: none;"></div>
+        </div>
+
+        <!-- SECCIÓN: SIEMBRA 2 / SEGUNDO CULTIVO O OTRA FECHA -->
+        <div style="background: rgba(59, 130, 246, 0.07); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-weight: 700; color: #60a5fa; font-size: 0.92rem; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="layers" style="width: 16px; height: 16px;"></i> Siembra 2 (Distinta Fecha / Segundo Cultivo)
+            </span>
+            <span style="font-size: 0.75rem; color: #93c5fd; font-weight: 600;" id="calc-preview-2-mini"></span>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="lote-form-cultivo2">Cultivo / Variedad</label>
+              <input type="text" id="lote-form-cultivo2" class="form-control" list="crop-suggestions" placeholder="Ej. Café (Lote Nuevo) o Plátano">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-fecha2">Fecha de Siembra</label>
+              <input type="date" id="lote-form-fecha2" class="form-control">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-arboles2" style="color: #bfdbfe;">Nº Árboles Actuales Sembrados</label>
+              <input type="number" id="lote-form-arboles2" class="form-control" min="0" step="1" placeholder="Ej. 5800">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-pendientes2" style="color: #fde68a;">Árboles Pendientes (Por Sembrar)</label>
+              <input type="number" id="lote-form-pendientes2" class="form-control" min="0" step="1" placeholder="Ej. 1000">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-surco2" style="color: #bfdbfe;" title="Distancia entre surcos o calles en metros">Dist. Surcos (m)</label>
+              <input type="number" id="lote-form-surco2" class="form-control" min="0" step="0.05" placeholder="Ej. 1.45">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-planta2" style="color: #bfdbfe;" title="Distancia entre plantas del mismo surco en metros">Dist. Plantas (m)</label>
+              <input type="number" id="lote-form-planta2" class="form-control" min="0" step="0.05" placeholder="Ej. 1.25">
+            </div>
+          </div>
+          <div id="calc-preview-2" style="font-size: 0.78rem; color: #93c5fd; margin-top: 8px; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 6px; display: none;"></div>
+        </div>
+
+        <!-- BOTÓN PARA DESPLEGAR SIEMBRA 3 -->
+        <div style="margin-bottom: 14px; text-align: right;">
+          <button type="button" class="btn btn-secondary" id="btn-toggle-siembra3" style="font-size: 0.78rem; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="plus-circle" style="width: 14px; height: 14px; color: #fbbf24;"></i>
+            <span id="btn-toggle-siembra3-lbl">+ Agregar 3ª Siembra / Policultivo</span>
+          </button>
+        </div>
+
+        <!-- SECCIÓN: SIEMBRA 3 / TERCER CULTIVO O OTRA ETAPA (DINÁMICO) -->
+        <div id="sec-siembra-3" style="display: none; background: rgba(245, 158, 11, 0.07); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 12px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-weight: 700; color: #fbbf24; font-size: 0.92rem; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="sprout" style="width: 16px; height: 16px;"></i> Siembra 3 (Tercer Cultivo / Lote Adicional)
+            </span>
+            <span style="font-size: 0.75rem; color: #fde68a; font-weight: 600;" id="calc-preview-3-mini"></span>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="lote-form-cultivo3">Cultivo / Variedad</label>
+              <input type="text" id="lote-form-cultivo3" class="form-control" list="crop-suggestions" placeholder="Ej. Aguacate Hass o Café Soca">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-fecha3">Fecha de Siembra</label>
+              <input type="date" id="lote-form-fecha3" class="form-control">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-arboles3" style="color: #fde68a;">Nº Árboles Actuales Sembrados</label>
+              <input type="number" id="lote-form-arboles3" class="form-control" min="0" step="1" placeholder="Ej. 1200">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-pendientes3" style="color: #fde68a;">Árboles Pendientes (Por Sembrar)</label>
+              <input type="number" id="lote-form-pendientes3" class="form-control" min="0" step="1" placeholder="Ej. 500">
+            </div>
+          </div>
+          <div class="form-row-2" style="margin-top: 6px;">
+            <div class="form-group">
+              <label for="lote-form-surco3" style="color: #fde68a;" title="Distancia entre surcos o calles en metros">Dist. Surcos (m)</label>
+              <input type="number" id="lote-form-surco3" class="form-control" min="0" step="0.05" placeholder="Ej. 6.00">
+            </div>
+            <div class="form-group">
+              <label for="lote-form-planta3" style="color: #fde68a;" title="Distancia entre plantas del mismo surco en metros">Dist. Plantas (m)</label>
+              <input type="number" id="lote-form-planta3" class="form-control" min="0" step="0.05" placeholder="Ej. 5.00">
+            </div>
+          </div>
+          <div id="calc-preview-3" style="font-size: 0.78rem; color: #fbbf24; margin-top: 8px; background: rgba(0,0,0,0.25); padding: 6px 10px; border-radius: 6px; display: none;"></div>
+        </div>
+
+        <!-- SECCIÓN: ÁREA Y ASISTENTE BI: CAPACIDAD INSTALADA VS TEÓRICA -->
+        <div style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div style="font-weight: 700; color: #fff; font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="pie-chart" style="width: 16px; height: 16px; color: #34d399;"></i>
+              Área del Lote & Balance de Capacidad Teórica vs Real
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-secondary" id="btn-calc-area" style="font-size: 0.75rem; padding: 4px 10px;" title="Calcular automáticamente el área ocupada según los árboles y sus distancias">
+                <i data-lucide="calculator" style="width: 14px; height: 14px;"></i> Auto-Calcular Área
+              </button>
+              <button type="button" class="btn btn-secondary" id="btn-calc-arboles" style="font-size: 0.75rem; padding: 4px 10px;" title="Estimar número de árboles según el área ingresada y la distancia de siembra">
+                <i data-lucide="binary" style="width: 14px; height: 14px;"></i> Estimar Árboles
+              </button>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="lote-form-area" style="font-weight: 700; color: #34d399;">Área Total del Lote (Hectáreas) *</label>
+              <input type="number" id="lote-form-area" class="form-control" required step="0.01" min="0.01" placeholder="Ej. 3.50">
+            </div>
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="lote-form-pendientes" style="font-weight: 700; color: #fbbf24;" title="Total de árboles pendientes o proyectados por sembrar en este lote">
+                Árboles Totales Pendientes (Por Sembrar)
+              </label>
+              <input type="number" id="lote-form-pendientes" class="form-control" min="0" step="1" placeholder="Ej. 2500">
+            </div>
+          </div>
+
+          <!-- Resumen dinámico BI de Capacidad y Densidades -->
+          <div id="lote-densidad-summary" style="margin-top: 10px;"></div>
+        </div>
+        
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:20px;">
+          <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-lote">Guardar Lote</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Crear/Editar Actividad -->
+  <div class="modal-overlay" id="act-modal">
+    <div class="modal-content" style="width: 550px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="act-modal-title">Programar Actividad</h3>
+        <button class="modal-close"><i data-lucide="x"></i></button>
+      </div>
+      <form id="act-form">
+        <input type="hidden" id="act-form-id">
+        
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="act-form-lote">Lote Asociado *</label>
+            <select id="act-form-lote" class="form-control" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="act-form-cultivo-objetivo">Cultivo Objetivo *</label>
+            <select id="act-form-cultivo-objetivo" class="form-control" required>
+              <!-- Dinámico -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Chips Rápidos de Labores -->
+        <div style="margin-bottom: 12px;">
+          <label style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:6px;">Sugerencias Rápidas de Labor (1 Clic para autocompletar):</label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Plateo para café', 'Café', 'Crecimiento')">🌱 Plateo</button>
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Guadaña general', 'Ambos Cultivos', 'Crecimiento')">🚜 Guadaña</button>
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Deschuponada de café', 'Café', 'Fructificación')">🌿 Deschuponada</button>
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Control de Plagas', 'Aguacate', 'Floración')">💊 Control Plagas</button>
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Fertilización Foliar', 'Café', 'Crecimiento')">🧪 Fert. Foliar</button>
+            <button type="button" class="chip-labor" onclick="fillModalLabor('Fertilización Suelo', 'Café', 'Siembra')">🌾 Fert. Suelo</button>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="act-form-tipo">Tipo de Labor *</label>
+            <input type="text" id="act-form-tipo" class="form-control" list="labor-suggestions" required placeholder="Ej. Fertilización Foliar">
+          </div>
+
+          <div class="form-group">
+            <label for="act-form-producto">Insumo / Producto Utilizado</label>
+            <input type="text" id="act-form-producto" class="form-control" list="producto-suggestions" placeholder="Ej. NPK 15-15-15 o Glifosato">
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="act-form-etapa">Etapa del Cultivo</label>
+            <select id="act-form-etapa" class="form-control">
+              <option value="Siembra">Siembra / Establecimiento</option>
+              <option value="Crecimiento">Crecimiento / Vegetativo</option>
+              <option value="Floración">Floración</option>
+              <option value="Fructificación">Fructificación</option>
+              <option value="Cosecha">Cosecha</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="act-form-dosificacion">Dosificación Prescrita</label>
+            <input type="text" id="act-form-dosificacion" class="form-control" list="dosificacion-suggestions" placeholder="Ej. 2 ml/L, 200g/árbol">
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="act-form-metodo">Tipo de Aplicación</label>
+            <select id="act-form-metodo" class="form-control">
+              <option value="Foliar">Foliar (Líquida)</option>
+              <option value="Suelo / Piso">Suelo / Piso (Granulado/Sólido)</option>
+              <option value="Herbicida">Herbicida</option>
+              <option value="Riego / Fertirriego">Riego / Fertirriego</option>
+              <option value="Otro">Otro Método</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <div class="form-row-2" style="gap: 10px; margin-bottom: 0;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="act-form-cantidad">Cantidad Total</label>
+                <input type="number" id="act-form-cantidad" class="form-control" placeholder="Ej. 50">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label for="act-form-unidad">Unidad</label>
+                <select id="act-form-unidad" class="form-control">
+                  <option value="Kg">Kg</option>
+                  <option value="L">L</option>
+                  <option value="g">g</option>
+                  <option value="ml">ml</option>
+                  <option value="Sacos">Sacos</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="act-form-fecha">Fecha Programada *</label>
+            <input type="date" id="act-form-fecha" class="form-control" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="act-form-personal">Personal Responsable *</label>
+            <input type="text" id="act-form-personal" class="form-control" list="personal-suggestions" required placeholder="Nombre de operario">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="act-form-notas">Observaciones y Notas de Campo (Se analizarán en el Dashboard)</label>
+          <textarea id="act-form-notas" class="form-control" rows="3" placeholder="Registre incidencias (maleza, plagas, deficiencias encontradas) o notas de aplicación..."></textarea>
+        </div>
+
+        <!-- Selector de Estado de Cumplimiento -->
+        <div class="form-group" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px; margin-bottom: 16px;">
+          <label style="font-weight: 700; color: #fff; margin-bottom: 8px; display: block; font-size: 0.88rem;">
+            <i data-lucide="check-circle-2" style="width:16px; height:16px; color:#10b981; vertical-align:middle; margin-right:4px;"></i>
+            Estado de la Labor
+          </label>
+          <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #f59e0b; font-weight: 600; font-size: 0.88rem;">
+              <input type="radio" name="act-form-cumplida" id="act-form-cumplida-no" value="false" checked style="accent-color: #f59e0b; width: 17px; height: 17px;">
+              <span>⏳ Pendiente por Realizar</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #10b981; font-weight: 600; font-size: 0.88rem;">
+              <input type="radio" name="act-form-cumplida" id="act-form-cumplida-si" value="true" style="accent-color: #10b981; width: 17px; height: 17px;">
+              <span>✔ Cumplida / Ya Ejecutada</span>
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:20px; flex-wrap:wrap;">
+          <button type="button" class="btn btn-secondary" id="btn-act-save-and-another" style="display:flex; align-items:center; gap:6px; border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
             <i data-lucide="plus-circle"></i> Guardar y Otra
           </button>
-          <div style="display:flex; gap:10px;">
+          <div style="display:flex; gap:12px;">
             <button type="button" class="btn btn-secondary modal-cancel">Cancelar</button>
-            <button type="submit" class="btn btn-primary" id="btn-act-submit" style="font-weight: 700; display:flex; align-items:center; gap:6px;">
-              <i data-lucide="check"></i> Guardar Actividad
-            </button>
+            <button type="submit" class="btn btn-primary" id="btn-act-submit">Agendar Actividad</button>
           </div>
         </div>
       </form>
