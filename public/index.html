@@ -358,7 +358,7 @@
             </div>
           </div>
 
-          <form id="quick-act-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto; gap: 10px; align-items: flex-end;">
+          <form id="quick-act-form" onsubmit="guardarActividadExpress(); return false;" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto; gap: 10px; align-items: flex-end;">
             <div>
               <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 4px;">Lote *</label>
               <select id="quick-act-lote" class="form-control" required style="font-size: 0.85rem; padding: 7px 10px;"></select>
